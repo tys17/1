@@ -1,27 +1,58 @@
 import numpy as np
+import scipy as sp
+import scipy.ndimage as ndimage
 import sys
 import pdb
+import math
+import warnings
+
+
+# start at x = 410, y = 400
+global occu_thresh, n_particles
+occu_thresh = 0.1
+n_particles = 1
 
 from MapReader import MapReader
 from MotionModel import MotionModel
 from SensorModel import SensorModel
 from Resampling import Resampling
+from draw_robot import draw_robot, draw_pointer_end
 
 from matplotlib import pyplot as plt
 from matplotlib import figure as fig
+#from matplotlib.pyplot import imshow, pause
+
 import time
+
+def filter_close_map(occupancy_map):
+    # filter
+    occupancy_map = np.logical_and(occupancy_map < occu_thresh, occupancy_map >= 0)
+
+    # close
+    # ndimage.binary_closing(occupancy_map, structure=np.ones((100,100))).astype(np.int)
+
+    return occupancy_map
+
 
 def visualize_map(occupancy_map):
     fig = plt.figure()
     # plt.switch_backend('TkAgg')
     mng = plt.get_current_fig_manager();  # mng.resize(*mng.window.maxsize())
-    plt.ion(); plt.imshow(occupancy_map, cmap='Greys'); plt.axis([0, 800, 0, 800]);
+    plt.ion(); plt.imshow(occupancy_map, cmap='gray'); plt.axis([0, 800, 0, 800]);
+#    x = np.random.rand(4,5)
+#    imshow(x)
+#    pause(10);
 
 
 def visualize_timestep(X_bar, tstep):
     x_locs = X_bar[:,0]/10.0
     y_locs = X_bar[:,1]/10.0
+
+    endx, endy = draw_pointer_end(x_locs, y_locs, X_bar[:,2])
+
+    fig = plt.figure(1)
     scat = plt.scatter(x_locs, y_locs, c='r', marker='o')
+    plt.plot(np.hstack((x_locs, endx)), np.hstack((y_locs, endy)), 'g-')
     plt.pause(0.00001)
     scat.remove()
 
@@ -29,8 +60,8 @@ def init_particles_random(num_particles, occupancy_map):
 
     # initialize [x, y, theta] positions in world_frame for all particles
     # (randomly across the map) 
-    y0_vals = np.random.uniform( 0, 7000, (num_particles, 1) )
-    x0_vals = np.random.uniform( 3000, 7000, (num_particles, 1) )
+    y0_vals = np.random.uniform( 0, 800, (num_particles, 1) )
+    x0_vals = np.random.uniform( 300, 750, (num_particles, 1) )
     theta0_vals = np.random.uniform( -3.14, 3.14, (num_particles, 1) )
 
     # initialize weights for all particles
@@ -50,7 +81,16 @@ def init_particles_freespace(num_particles, occupancy_map):
     TODO : Add your code here
     """ 
 
+    n_candidate = num_particles*2
+    X_bar_candidate = init_particles_random(n_candidate, occupancy_map)
+    
+    good_particles_idx = occupancy_map[X_bar_candidate[:,1].astype(int), X_bar_candidate[:,0].astype(int)].astype(bool)
+    X_bar_init = X_bar_candidate[good_particles_idx]
+    # X_bar_init = np.unique(X_bar_init[:,:2], axis=0)
     return X_bar_init
+
+def init_test_particle():
+    return np.array([[4100,4000,math.pi, 1]])
 
 def main():
 
@@ -71,15 +111,21 @@ def main():
     src_path_log = '../data/log/robotdata1.log'
 
     map_obj = MapReader(src_path_map)
-    occupancy_map = map_obj.get_map() 
+    occupancy_map = map_obj.get_map()
+    # get the free space map
+    occupancy_map = filter_close_map(occupancy_map)
+    # occupancy_map = np.logical_and(occupancy_map<occu_thresh, occupancy_map>=0)
+    
     logfile = open(src_path_log, 'r')
 
     motion_model = MotionModel()
     sensor_model = SensorModel(occupancy_map)
     resampler = Resampling()
 
-    num_particles = 500
-    X_bar = init_particles_random(num_particles, occupancy_map)
+    num_particles = n_particles
+#    X_bar = init_particles_random(num_particles, occupancy_map)
+#     X_bar = init_particles_freespace(num_particles, occupancy_map)
+    X_bar = init_test_particle()
 
     vis_flag = 1
 
@@ -89,6 +135,8 @@ def main():
     if vis_flag:
         visualize_map(occupancy_map)
 
+    draw_robot(X_bar)
+        
     first_time_idx = True
     for time_idx, line in enumerate(logfile):
 
@@ -106,7 +154,7 @@ def main():
              odometry_laser = meas_vals[3:6] # [x, y, theta] coordinates of laser in odometry frame
              ranges = meas_vals[6:-1] # 180 range measurement values from single laser scan
         
-        print "Processing time step " + str(time_idx) + " at time " + str(time_stamp) + "s"
+        print("Processing time step " + str(time_idx) + " at time " + str(time_stamp) + "s")
 
         if (first_time_idx):
             u_t0 = odometry_robot
@@ -120,7 +168,7 @@ def main():
             """
             MOTION MODEL
             """
-            x_t0 = X_bar[m, 0:3]
+            x_t0 = X_bar[m,:3]
             x_t1 = motion_model.update(u_t0, u_t1, x_t0)
 
             """
@@ -146,4 +194,5 @@ def main():
             visualize_timestep(X_bar, time_idx)
 
 if __name__=="__main__":
+    warnings.simplefilter(action='ignore', category=FutureWarning)
     main()
