@@ -13,10 +13,10 @@ class MotionModel:
         """
         TODO : Initialize Motion Model parameters here
         """
-        self.a1 = 0
-        self.a2 = 0
-        self.a3 = 0
-        self.a4 = 0
+        self.a1 = 0.006
+        self.a2 = 0.0002
+        self.a3 = 0.0
+        self.a4 = 0.0
 
     def update(self, u_t0, u_t1, x_t0):
         """
@@ -65,6 +65,12 @@ class MotionModel:
         x_t1[0] = x_t0[0] + dtrans_p*np.cos(x_t0[2]+drot1_p);
         x_t1[1] = x_t0[1] + dtrans_p*np.sin(x_t0[2]+drot1_p);
         x_t1[2] = x_t0[2] + drot1_p + drot2_p;
+        if x_t1[2]>np.pi:
+            x_t1[2] = x_t1[2]-np.pi
+        if x_t1[2]<-np.pi:
+            x_t1[2] = x_t1[2]+np.pi
+
+
         # x_t1[3] = x_t0[3]
 
         return x_t1

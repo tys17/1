@@ -8,9 +8,9 @@ import warnings
 
 
 # start at x = 410, y = 400
-global occu_thresh, n_particles
+global occu_thresh, init_n_particles
 occu_thresh = 0.1
-n_particles = 1
+init_n_particles = 3000
 
 from MapReader import MapReader
 from MotionModel import MotionModel
@@ -44,24 +44,33 @@ def visualize_map(occupancy_map):
 #    pause(10);
 
 
-def visualize_timestep(X_bar, tstep):
-    x_locs = X_bar[:,0]/10.0
-    y_locs = X_bar[:,1]/10.0
+def visualize_timestep(X_bar, tstep, occupancy_map):
+    # x_locs = X_bar[:,0]/10.0
+    # y_locs = X_bar[:,1]/10.0
 
-    endx, endy = draw_pointer_end(x_locs, y_locs, X_bar[:,2])
+    # endx, endy = draw_pointer_end(x_locs, y_locs, X_bar[:,2])
 
     fig = plt.figure(1)
-    scat = plt.scatter(x_locs, y_locs, c='r', marker='o')
-    plt.plot(np.hstack((x_locs, endx)), np.hstack((y_locs, endy)), 'g-')
-    plt.pause(0.00001)
-    scat.remove()
+    plt.clf()
+
+    # plot map
+    mng = plt.get_current_fig_manager();  # mng.resize(*mng.window.maxsize())
+    plt.ion(); plt.imshow(occupancy_map, cmap='gray'); plt.axis([0, 800, 0, 800]);
+
+    # plot robots
+    # scat = plt.scatter(x_locs, y_locs, c='r', marker='o')
+    # plt.plot(np.vstack((x_locs, endx)).transpose(), np.vstack((y_locs, endy)).transpose(), 'g-')
+    # plt.pause(0.00001)
+    # scat.remove()
+
+    draw_robot(X_bar)
 
 def init_particles_random(num_particles, occupancy_map):
 
     # initialize [x, y, theta] positions in world_frame for all particles
     # (randomly across the map) 
-    y0_vals = np.random.uniform( 0, 800, (num_particles, 1) )
-    x0_vals = np.random.uniform( 300, 750, (num_particles, 1) )
+    y0_vals = np.random.uniform( 0, 8000, (num_particles, 1) )
+    x0_vals = np.random.uniform( 3000, 7500, (num_particles, 1) )
     theta0_vals = np.random.uniform( -3.14, 3.14, (num_particles, 1) )
 
     # initialize weights for all particles
@@ -81,16 +90,19 @@ def init_particles_freespace(num_particles, occupancy_map):
     TODO : Add your code here
     """ 
 
-    n_candidate = num_particles*2
+    n_candidate = init_n_particles
     X_bar_candidate = init_particles_random(n_candidate, occupancy_map)
     
-    good_particles_idx = occupancy_map[X_bar_candidate[:,1].astype(int), X_bar_candidate[:,0].astype(int)].astype(bool)
+    good_particles_idx = occupancy_map[(X_bar_candidate[:,1]/10).astype(int), (X_bar_candidate[:,0]/10).astype(int)].astype(bool)
     X_bar_init = X_bar_candidate[good_particles_idx]
     # X_bar_init = np.unique(X_bar_init[:,:2], axis=0)
+
+    # X_bar_init = X_bar_candidate[good_particles_idx]
+
     return X_bar_init
 
 def init_test_particle():
-    return np.array([[4100,4000,math.pi, 1]])
+    return np.array([[4150,3990,math.pi*175/180, 1], [4020,4000,math.pi, 1]])
 
 def main():
 
@@ -122,10 +134,13 @@ def main():
     sensor_model = SensorModel(occupancy_map)
     resampler = Resampling()
 
-    num_particles = n_particles
+    num_particles = init_n_particles
 #    X_bar = init_particles_random(num_particles, occupancy_map)
-#     X_bar = init_particles_freespace(num_particles, occupancy_map)
-    X_bar = init_test_particle()
+    X_bar = init_particles_freespace(num_particles, occupancy_map)
+    X_bar = np.vstack((X_bar, init_test_particle()))
+    # X_bar = init_test_particle()
+
+    num_particles, _ = X_bar.shape
 
     vis_flag = 1
 
@@ -163,18 +178,24 @@ def main():
 
         X_bar_new = np.zeros( (num_particles,4), dtype=np.float64)
         u_t1 = odometry_robot
+
         for m in range(0, num_particles):
 
             """
             MOTION MODEL
             """
-            x_t0 = X_bar[m,:3]
-            x_t1 = motion_model.update(u_t0, u_t1, x_t0)
+            if np.linalg.norm(u_t0 - u_t1) != 0:
+                x_t0 = X_bar[m,:3]
+                x_t1 = motion_model.update(u_t0, u_t1, x_t0)
+            else:
+                x_t0 = X_bar[m, :3]
+                x_t1 = x_t0
+
 
             """
             SENSOR MODEL
             """
-            if (meas_type == "L"):
+            if (meas_type == "L" ) and (np.linalg.norm(u_t0-u_t1) != 0):
                 z_t = ranges
                 w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
                 # w_t = 1/num_particles
@@ -183,15 +204,20 @@ def main():
                 X_bar_new[m,:] = np.hstack((x_t1, X_bar[m,3]))
         
         X_bar = X_bar_new
+        moved = np.linalg.norm(u_t0-u_t1) != 0
         u_t0 = u_t1
 
         """
         RESAMPLING
         """
-        X_bar = resampler.low_variance_sampler(X_bar)
 
-        if vis_flag:
-            visualize_timestep(X_bar, time_idx)
+        if moved:
+            if meas_type == "L":
+                X_bar = resampler.low_variance_sampler(X_bar)
+                print X_bar.shape
+                num_particles, _ = X_bar.shape
+            if vis_flag:
+                visualize_timestep(X_bar, time_idx, occupancy_map)
 
 if __name__=="__main__":
     warnings.simplefilter(action='ignore', category=FutureWarning)

@@ -17,6 +17,7 @@ def draw_robot(points):
 
     plt.plot(startx, starty, 'r.')
     plt.plot([startx, endx], [starty, endy], 'g-')
+    plt.pause(0.0001)
 
 def draw_pointer_end(startx, starty, angle):
 
@@ -27,12 +28,19 @@ def draw_pointer_end(startx, starty, angle):
 
     return endx, endy
 
-def draw_laser_beam(tracings, robo_loc):
+def draw_laser_beam(tracings, robo_loc, occ):
 
     n = tracings.size
     startx = robo_loc[0]/10
     starty = robo_loc[1]/10
     robo_ori = robo_loc[2]
+
+    fig = plt.figure(1)
+    plt.clf()
+
+    plt.ion();
+    plt.imshow(occ, cmap='gray');
+    plt.axis([0, 800, 0, 800]);
 
     for i in range(n):
         length = tracings[i]
@@ -41,6 +49,8 @@ def draw_laser_beam(tracings, robo_loc):
         endx = startx + length * math.cos(robo_ori + cur_angle - math.pi/2)
         endy = starty + length * math.sin(robo_ori + cur_angle - math.pi/2)
 
-        fig = plt.figure(1)
         plt.plot([startx, endx], [starty, endy], 'b-')
+
+    plt.pause(0.00001)
+
 
