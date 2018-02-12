@@ -11,13 +11,13 @@ from multiprocessing import Pool, Process, Value, Array
 # start at x = 410, y = 400
 global occu_thresh, init_n_particles
 occu_thresh = 0.1
-init_n_particles = 3000
+init_n_particles = 8000
 
 from MapReader import MapReader
 from MotionModel import MotionModel
 from SensorModel import SensorModel
 from Resampling import Resampling
-from draw_robot import draw_robot, draw_pointer_end
+from draw_robot import draw_robot, draw_pointer_end, draw_reference
 
 from matplotlib import pyplot as plt
 from matplotlib import figure as fig
@@ -136,7 +136,11 @@ def init_particles_freespace(num_particles, occupancy_map):
     return X_bar_init
 
 def init_test_particle():
-    return np.array([[4150,3990,math.pi*175/180, 1], [4020,4000,math.pi, 1]])
+    # start
+    return np.array([[4150,3990,math.pi*175/180, 1], [4020,4000,math.pi, 1/init_n_particles]])
+
+    # time = 648, 37.986323
+    # return np.array([[3918.78833342,  2884.12596544,     4.71621719, 1]])
 
 def main():
 
@@ -181,13 +185,22 @@ def main():
     """
     Monte Carlo Localization Algorithm : Main Loop
     """
-    # if vis_flag:
-    #     visualize_map(occupancy_map)
+    if vis_flag:
+        visualize_map(occupancy_map)
 
-    # draw_robot(X_bar)
+    draw_robot(X_bar)
         
     first_time_idx = True
     u_t0 = np.array([0])
+
+    ref = np.array([[4150,3990,math.pi*175/180]])
+
+    X_bar_new = np.zeros((0, 4), dtype=np.float64)
+    laser_process = True
+    LASER_MOD = 3
+    laser_cnt = LASER_MOD
+
+
     for time_idx, line in enumerate(logfile):
 
         # Read a single 'line' from the log file (can be either odometry or laser measurement)
@@ -197,14 +210,20 @@ def main():
         odometry_robot = meas_vals[0:3] # odometry reading [x, y, theta] in odometry frame
         time_stamp = meas_vals[-1]
 
-        # if ((time_stamp <= 0.0) | (meas_type == "O")): # ignore pure odometry measurements for now (faster debugging) 
+        # if ((time_stamp <= 0.0) | (meas_type == "O")): # ignore pure odometry measurements for now (faster debugging)
             # continue
 
         ranges = np.array([0])
         if (meas_type == "L"):
-             odometry_laser = meas_vals[3:6] # [x, y, theta] coordinates of laser in odometry frame
-             ranges = meas_vals[6:-1] # 180 range measurement values from single laser scan
-        
+            odometry_laser = meas_vals[3:6] # [x, y, theta] coordinates of laser in odometry frame
+            ranges = meas_vals[6:-1] # 180 range measurement values from single laser scan
+            laser_cnt = (laser_cnt+1)%LASER_MOD
+        if laser_cnt == 0:
+            laser_process = True
+        else:
+            laser_process = False
+
+
         print("Processing time step " + str(time_idx) + " at time " + str(time_stamp) + "s")
 
         if (first_time_idx):
@@ -212,47 +231,47 @@ def main():
             first_time_idx = False
             continue
 
-        # X_bar_new = np.zeros( (num_particles,4), dtype=np.float64)
+        # if time_idx < 1600:
+        #     continue
+        #
+        # if time_idx == 1600:
+        #     X_bar[-1, :] = np.array([4.02993436e+03, 4.67264556e+03, 1.66812442e+00, 1])
+        #     visualize_timestep(X_bar, time_idx, occupancy_map)
+        #     draw_reference(ref)
+            # X_bar[:, 2] -= 25/180*math.pi
+
+
         u_t1 = odometry_robot
 
-        X_bar_new = X_bar
-
-        # pool = Pool(4)
+        ref[0] = motion_model.update(u_t0, u_t1, ref[0])
 
         for m in range(0, num_particles):
-            X_bar_new[m, :] = parallel_motion_sensor_model(m, u_t0, u_t1, ranges, meas_type,
-                                                                              sensor_model, motion_model,
-                                                                              X_bar_new[m, :])
-            # X_bar_new[m,:] = pool.apply_async(parallel_motion_sensor_model, (m, u_t0, u_t1, ranges, meas_type,
-            #                                                sensor_model, motion_model, X_bar_new[m,:]))
-        # pool.close()
-        # pool.join()
 
-        # for m in range(0, num_particles):
-        #
-        #     """
-        #     MOTION MODEL
-        #     """
-        #     if np.linalg.norm(u_t0 - u_t1) != 0:
-        #         x_t0 = X_bar[m,:3]
-        #         x_t1 = motion_model.update(u_t0, u_t1, x_t0)
-        #     else:
-        #         x_t0 = X_bar[m, :3]
-        #         x_t1 = x_t0
-        #
-        #
-        #     """
-        #     SENSOR MODEL
-        #     """
-        #     if (meas_type == "L" ) and (np.linalg.norm(u_t0-u_t1) != 0):
-        #         z_t = ranges
-        #         w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
-        #         # w_t = 1/num_particles
-        #         X_bar_new[m,:] = np.hstack((x_t1, w_t))
-        #     else:
-        #         X_bar_new[m,:] = np.hstack((x_t1, X_bar[m,3]))
-        
-        X_bar = X_bar_new
+            """
+            MOTION MODEL
+            """
+            if np.linalg.norm(u_t0 - u_t1) != 0:
+                x_t0 = X_bar[m,:3]
+                x_t1 = motion_model.update(u_t0, u_t1, x_t0)
+            else:
+                x_t0 = X_bar[m, :3]
+                x_t1 = x_t0
+
+
+            """
+            SENSOR MODEL
+            """
+            if (meas_type == "L" ) and (np.linalg.norm(u_t0-u_t1) != 0) and laser_process:
+                z_t = ranges
+                w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
+                # w_t = 1/num_particles
+                # X_bar_new[m,:] = np.hstack((x_t1, w_t))
+                X_bar[m, :] = np.hstack((x_t1, w_t))
+            else:
+                X_bar[m, :] = np.hstack((x_t1, X_bar[m, 3]))
+                # X_bar_new[m,:] = np.hstack((x_t1, X_bar[m,3]))
+
+        # X_bar = X_bar_new
         moved = np.linalg.norm(u_t0-u_t1) != 0
         u_t0 = u_t1
 
@@ -261,12 +280,13 @@ def main():
         """
 
         if moved:
-            if meas_type == "L":
+            if meas_type == "L" and laser_process:
                 X_bar = resampler.low_variance_sampler(X_bar)
                 print X_bar.shape
                 num_particles, _ = X_bar.shape
-            if vis_flag:
                 visualize_timestep(X_bar, time_idx, occupancy_map)
+                plt.savefig('./vid1/time_'+str(time_idx)+'.png')
+                # draw_reference(ref)
 
 if __name__=="__main__":
     warnings.simplefilter(action='ignore', category=FutureWarning)

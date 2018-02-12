@@ -49,14 +49,13 @@ class Resampling:
 
         i = 0
         cnt = 0
-
+        n_select = 500
         prev_i = i
-        prev_pos = X_bar[0, :]
-        prev_neg = X_bar[0, :]
-        for m in range(n):
-            if cnt>=n:
-                break
 
+        if n <= 500:
+            n_select = max(n-100, 100)
+
+        for m in range(n_select):
             bar = (r + m*mean)%W
             while bar > cur_pos:
                 i = (i+1)%n
@@ -64,22 +63,16 @@ class Resampling:
             cur_pos = cur_pos % W
 
             if prev_i == i:
-                # rand2 = np.array(
-                #     [X_bar[i, 0] + np.random.normal(-5, 5),
-                #      X_bar[i, 1] + np.random.normal(-5, 5),
-                #      X_bar[i, 2] + np.random.normal(-np.pi / 10, np.pi / 10),
-                #      X_bar[i, 3]])
 
                 rand2 = np.array(
-                    [X_bar[i, 0] + np.random.normal(-10, 10),
-                     X_bar[i, 1] + np.random.normal(-10, 10),
-                     X_bar[i, 2],
+                    [X_bar[i, 0] + np.random.normal(0, 5),
+                     X_bar[i, 1] + np.random.normal(0, 5),
+                     X_bar[i, 2]+ np.random.normal(0, np.pi / 30),
                      X_bar[i, 3]])
 
                 X_bar_resampled = np.append(X_bar_resampled, [rand2], axis=0)
             else:
                 X_bar_resampled = np.append(X_bar_resampled, [X_bar[i, :]], axis=0)
-            cnt += 1
             prev_i = i
 
 

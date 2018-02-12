@@ -17,7 +17,20 @@ def draw_robot(points):
 
     plt.plot(startx, starty, 'r.')
     plt.plot([startx, endx], [starty, endy], 'g-')
-    plt.pause(0.0001)
+    plt.pause(0.00001)
+
+def draw_reference(points):
+    fig = plt.figure(1)
+    angle = points[:,2]
+
+    startx = points[:, 0] / 10
+    starty = points[:, 1] / 10
+
+    endx, endy = draw_pointer_end(startx, starty, angle)
+
+    plt.plot(startx, starty, 'y*')
+    plt.plot([startx, endx[0]], [starty, endy[0]], 'y-')
+    plt.pause(0.00001)
 
 def draw_pointer_end(startx, starty, angle):
 

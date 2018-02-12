@@ -21,15 +21,15 @@ class SensorModel:
         """
         self.occupancy_map = occupancy_map
         # self.z_hit = 0.59191922303198874
-        self.z_hit = 0.40191922303198874
-        self.z_short = 0.19086437798187422
+        self.z_hit = 0.20191922303198874
+        self.z_short = 0.16086437798187422
         self.z_max = 0.0
         self.z_rand = 0.21721639898613709
         # self.sigma_hit = 32.294841737915263
-        self.sigma_hit = 200.294841737915263
+        self.sigma_hit = 80.294841737915263
         # self.lambda_short = 0.0066950590367511505
-        self.lambda_short = 0.166950590367511505
-        self.max_range = 8183
+        self.lambda_short = 0.0066950590367511505  # make this smaller!
+        self.max_range = 4183
         self.intrinsics_conv_th = 0.01
         self.stride = 5
         self.scale_up = 200
@@ -135,8 +135,8 @@ class SensorModel:
         laser_x = x_t1[0] + math.cos(x_t1[2]) * 25
         laser_y = x_t1[1] + math.sin(x_t1[2]) * 25
 
-        if self.occupancy_map[(x_t1[1]/10).astype(int), (x_t1[0]/10).astype(int)] == 0:
-            return 1e-2000
+        # if self.occupancy_map[(x_t1[1]/10).astype(int), (x_t1[0]/10).astype(int)] == 0:
+        #     return 1e-2000
 
         z_t1_prime = self.laser_input(laser_x, laser_y, x_t1[2])
         # visualization
@@ -158,9 +158,31 @@ class SensorModel:
 
         return q
 
-    # def draw_distribution(self):
-    #     x = np.arange(8183)
-    #     y_short = compute_Pshort(self, z, zprime)
+
+
+
+def laser_input(self, x, y, theta):
+    x = x / 10
+    y = y / 10
+    laserdegree = (np.asarray(range(0, 180, self.stride)) + theta * 180 / np.pi) % 360 - 90
+    degreenum = int((180 / self.stride))
+    zs = np.zeros((degreenum,))
+    cosset = np.cos(laserdegree * np.pi / 180)
+    sinset = np.sin(laserdegree * np.pi / 180)
+    for i in range(degreenum):
+        searchx = x
+        searchy = y
+        pos = 1
+        while 0 <= searchy < self.occupancy_map.shape[0] \
+                and 0 <= searchx < self.occupancy_map.shape[1] \
+                and pos <= self.max_range/10:
+            if self.occupancy_map[searchy.astype(int), searchx.astype(int)]!=1:
+                break
+            searchx = searchx + cosset[i]
+            searchy = searchy + sinset[i]
+            pos = pos + 1
+        zs[i] = pos*10
+    return zs
 
 
 if __name__ == '__main__':
