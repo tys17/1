@@ -71,8 +71,8 @@ class Resampling:
                 #      X_bar[i, 3]])
 
                 rand2 = np.array(
-                    [X_bar[i, 0] + np.random.normal(-10, 10),
-                     X_bar[i, 1] + np.random.normal(-10, 10),
+                    [X_bar[i, 0] + np.random.normal(0, 3),
+                     X_bar[i, 1] + np.random.normal(0, 3),
                      X_bar[i, 2],
                      X_bar[i, 3]])
 

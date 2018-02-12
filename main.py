@@ -154,7 +154,7 @@ def main():
     Initialize Parameters
     """
     src_path_map = '../data/map/wean.dat'
-    src_path_log = '../data/log/robotdata1.log'
+    src_path_log = '../data/log/robotdata2.log'
 
     map_obj = MapReader(src_path_map)
     occupancy_map = map_obj.get_map()
@@ -215,14 +215,14 @@ def main():
         # X_bar_new = np.zeros( (num_particles,4), dtype=np.float64)
         u_t1 = odometry_robot
 
-        X_bar_new = X_bar
+        #X_bar_new = X_bar
 
         # pool = Pool(4)
 
         for m in range(0, num_particles):
-            X_bar_new[m, :] = parallel_motion_sensor_model(m, u_t0, u_t1, ranges, meas_type,
+            X_bar[m, :] = parallel_motion_sensor_model(m, u_t0, u_t1, ranges, meas_type,
                                                                               sensor_model, motion_model,
-                                                                              X_bar_new[m, :])
+                                                                              X_bar[m, :])
             # X_bar_new[m,:] = pool.apply_async(parallel_motion_sensor_model, (m, u_t0, u_t1, ranges, meas_type,
             #                                                sensor_model, motion_model, X_bar_new[m,:]))
         # pool.close()
@@ -252,7 +252,7 @@ def main():
         #     else:
         #         X_bar_new[m,:] = np.hstack((x_t1, X_bar[m,3]))
         
-        X_bar = X_bar_new
+        #X_bar = X_bar_new
         moved = np.linalg.norm(u_t0-u_t1) != 0
         u_t0 = u_t1
 
@@ -263,7 +263,7 @@ def main():
         if moved:
             if meas_type == "L":
                 X_bar = resampler.low_variance_sampler(X_bar)
-                print X_bar.shape
+                print (X_bar.shape)
                 num_particles, _ = X_bar.shape
             if vis_flag:
                 visualize_timestep(X_bar, time_idx, occupancy_map)

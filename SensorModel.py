@@ -26,13 +26,16 @@ class SensorModel:
         self.z_max = 0.0
         self.z_rand = 0.21721639898613709
         # self.sigma_hit = 32.294841737915263
-        self.sigma_hit = 200.294841737915263
+        self.sigma_hit = 20.294841737915263
         # self.lambda_short = 0.0066950590367511505
         self.lambda_short = 0.166950590367511505
         self.max_range = 8183
         self.intrinsics_conv_th = 0.01
         self.stride = 5
-        self.scale_up = 200
+        self.scale_up = 20
+        self.mapinfo0={}
+        self.mapinfo1={}
+        self.mapinfo_size=1000000
 
     def generate_normaldis(self, x, medium, sigma):
         x = np.divide(np.subtract(x, medium), sigma)
@@ -68,19 +71,32 @@ class SensorModel:
         zs = np.zeros((degreenum,))
         cosset = np.cos(laserdegree * np.pi / 180)
         sinset = np.sin(laserdegree * np.pi / 180)
+        
+        x=round(2*x)/2
+        y=round(2*y)/2
+        laserdegree=np.round(2*laserdegree)/2
         for i in range(degreenum):
-            searchx = x
-            searchy = y
-            pos = 1
-            while 0 <= searchy < self.occupancy_map.shape[0] \
-                    and 0 <= searchx < self.occupancy_map.shape[1] \
-                    and pos <= self.max_range/10:
-                if self.occupancy_map[searchy.astype(int), searchx.astype(int)]!=1:
-                    break
-                searchx = searchx + cosset[i]
-                searchy = searchy + sinset[i]
-                pos = pos + 1
-            zs[i] = pos*10
+            if (x,y,laserdegree[i]) in self.mapinfo1:
+                zs[i]=self.mapinfo1[(x,y,laserdegree[i])]
+            elif (x,y,laserdegree[i]) in self.mapinfo0:
+                zs[i]=self.mapinfo0[(x,y,laserdegree[i])]
+            else:
+                searchx = x
+                searchy = y
+                pos = 1
+                while 0 <= searchy < self.occupancy_map.shape[0] \
+                        and 0 <= searchx < self.occupancy_map.shape[1] \
+                        and pos <= self.max_range/10:
+                    if self.occupancy_map[searchy.astype(int), searchx.astype(int)]!=1:
+                        break
+                    searchx = searchx + cosset[i]
+                    searchy = searchy + sinset[i]
+                    pos = pos + 1
+                zs[i] = pos*10
+                self.mapinfo1[(x,y,laserdegree[i])]=zs[i]
+                if len(self.mapinfo1)>self.mapinfo_size:
+                    self.mapinfo0=self.mapinfo1
+                    self.mapinfo1={}
         return zs
 
     def compute_P(self, z, zprime):
@@ -135,8 +151,8 @@ class SensorModel:
         laser_x = x_t1[0] + math.cos(x_t1[2]) * 25
         laser_y = x_t1[1] + math.sin(x_t1[2]) * 25
 
-        if self.occupancy_map[(x_t1[1]/10).astype(int), (x_t1[0]/10).astype(int)] == 0:
-            return 1e-2000
+        """if self.occupancy_map[(x_t1[1]/10).astype(int), (x_t1[0]/10).astype(int)] == 0:
+            return 1e-2000"""
 
         z_t1_prime = self.laser_input(laser_x, laser_y, x_t1[2])
         # visualization
