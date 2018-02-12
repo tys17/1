@@ -158,7 +158,7 @@ def main():
     Initialize Parameters
     """
     src_path_map = '../data/map/wean.dat'
-    src_path_log = '../data/log/robotdata1.log'
+    src_path_log = '../data/log/robotdata2.log'
 
     map_obj = MapReader(src_path_map)
     occupancy_map = map_obj.get_map()
@@ -282,12 +282,13 @@ def main():
         if moved:
             if meas_type == "L" and laser_process:
                 X_bar = resampler.low_variance_sampler(X_bar)
-                print X_bar.shape
+                print (X_bar.shape)
                 num_particles, _ = X_bar.shape
+                fig = plt.gcf()
                 visualize_timestep(X_bar, time_idx, occupancy_map)
-                plt.savefig('./vid1/time_'+str(time_idx)+'.png')
+                fig1.savefig('./vid2/time_'+str(time_idx)+'.png')
                 # draw_reference(ref)
 
 if __name__=="__main__":
     warnings.simplefilter(action='ignore', category=FutureWarning)
-    main()
+main()
