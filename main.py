@@ -5,7 +5,7 @@ import sys
 import pdb
 import math
 import warnings
-from multiprocessing import Pool
+from multiprocessing import Pool, Process, Value, Array
 
 
 # start at x = 410, y = 400
@@ -34,15 +34,15 @@ class parallel_args:
         self.means_type = "L"
 
 
-def parallel_motion_sensor_model(m, u_t0, u_t1, X_bar, ranges, meas_type, sensor_model, motion_model, X_bar_new):
+def parallel_motion_sensor_model(m, u_t0, u_t1, ranges, meas_type, sensor_model, motion_model, X_bar_new):
     """
     MOTION MODEL
     """
     if np.linalg.norm(u_t0 - u_t1) != 0:
-        x_t0 = X_bar[m,:3]
+        x_t0 = X_bar_new[:3]
         x_t1 = motion_model.update(u_t0, u_t1, x_t0)
     else:
-        x_t0 = X_bar[m, :3]
+        x_t0 = X_bar_new[:3]
         x_t1 = x_t0
 
     """
@@ -52,9 +52,9 @@ def parallel_motion_sensor_model(m, u_t0, u_t1, X_bar, ranges, meas_type, sensor
         z_t = ranges
         w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
         # w_t = 1/num_particles
-        X_bar_new[m,:] = np.hstack((x_t1, w_t))
+        X_bar_new = np.hstack((x_t1, w_t))
     else:
-        X_bar_new[m,:] = np.hstack((x_t1, X_bar[m,3]))
+        X_bar_new = np.hstack((x_t1, X_bar_new[3]))
 
     return X_bar_new
 
@@ -217,18 +217,16 @@ def main():
 
         X_bar_new = X_bar
 
-        pool = Pool(4)
+        # pool = Pool(4)
 
         for m in range(0, num_particles):
-            X_bar_new = pool.apply_async(parallel_motion_sensor_model, (num_particles, u_t0, u_t1, ranges, meas_type,
-                                                            sensor_model, motion_model, X_bar_new))
-            # X_bar_new = parallel_motion_sensor_model(m, u_t0, u_t1, X_bar, ranges, meas_type,
-            #                               sensor_model, motion_model, X_bar_new)
-            # pool.apply_async(parallel_motion_sensor_model, (num_particles, u_t0, u_t1, ranges, meas_type,
-            #                                                sensor_model, motion_model, X_bar_new))
-
-        pool.close()
-        pool.join()
+            X_bar_new[m, :] = parallel_motion_sensor_model(m, u_t0, u_t1, ranges, meas_type,
+                                                                              sensor_model, motion_model,
+                                                                              X_bar_new[m, :])
+            # X_bar_new[m,:] = pool.apply_async(parallel_motion_sensor_model, (m, u_t0, u_t1, ranges, meas_type,
+            #                                                sensor_model, motion_model, X_bar_new[m,:]))
+        # pool.close()
+        # pool.join()
 
         # for m in range(0, num_particles):
         #

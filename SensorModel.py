@@ -134,6 +134,10 @@ class SensorModel:
         # raytracing
         laser_x = x_t1[0] + math.cos(x_t1[2]) * 25
         laser_y = x_t1[1] + math.sin(x_t1[2]) * 25
+
+        if self.occupancy_map[(x_t1[1]/10).astype(int), (x_t1[0]/10).astype(int)] == 0:
+            return 1e-2000
+
         z_t1_prime = self.laser_input(laser_x, laser_y, x_t1[2])
         # visualization
         # draw_laser_beam(z_t1_prime, [laser_x, laser_y, x_t1[2]])
