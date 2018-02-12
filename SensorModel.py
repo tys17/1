@@ -26,7 +26,7 @@ class SensorModel:
         self.z_max = 0.0
         self.z_rand = 0.21721639898613709
         # self.sigma_hit = 32.294841737915263
-        self.sigma_hit = 80.294841737915263
+        self.sigma_hit = 200.294841737915263
         # self.lambda_short = 0.0066950590367511505
         self.lambda_short = 0.166950590367511505
         self.max_range = 8183

@@ -54,7 +54,7 @@ class Resampling:
         prev_pos = X_bar[0, :]
         prev_neg = X_bar[0, :]
         for m in range(n):
-            if cnt>n:
+            if cnt>=n:
                 break
 
             bar = (r + m*mean)%W
@@ -62,29 +62,24 @@ class Resampling:
                 i = (i+1)%n
                 cur_pos = (cur_pos+10**X_bar[i, 3])
             cur_pos = cur_pos % W
-            if prev_i == i:
-                store_x = prev_pos[0]
-                store_y = prev_pos[1]
-                store_ang_pos = prev_pos[2]
-                store_ang_neg = prev_neg[2]
-                wt = np.log10(10**prev_pos[3]/2)
 
-                rand1 = np.array(
-                    [X_bar[i, 0]+np.random.normal(-40, 40),X_bar[i, 1]+np.random.normal(-40, 40), store_ang_pos + np.pi/4 + np.random.normal(-np.pi/10,np.pi/10),wt])
-                X_bar_resampled = np.append(X_bar_resampled, [rand1], axis=0)
-                prev_pos = rand1
+            if prev_i == i:
+                # rand2 = np.array(
+                #     [X_bar[i, 0] + np.random.normal(-5, 5),
+                #      X_bar[i, 1] + np.random.normal(-5, 5),
+                #      X_bar[i, 2] + np.random.normal(-np.pi / 10, np.pi / 10),
+                #      X_bar[i, 3]])
 
                 rand2 = np.array(
-                    [X_bar[i, 0]+np.random.normal(-40, 40),X_bar[i, 1]+np.random.normal(-40, 40), store_ang_neg - np.pi / 4 + np.random.normal(-np.pi / 10, np.pi / 10), wt])
-                X_bar_resampled = np.append(X_bar_resampled, [rand2], axis=0)
-                prev_neg = rand2
+                    [X_bar[i, 0] + np.random.normal(-5, 5),
+                     X_bar[i, 1] + np.random.normal(-5, 5),
+                     X_bar[i, 2],
+                     X_bar[i, 3]])
 
-                cnt += 2
+                X_bar_resampled = np.append(X_bar_resampled, [rand2], axis=0)
             else:
                 X_bar_resampled = np.append(X_bar_resampled, [X_bar[i, :]], axis=0)
-                prev_pos = X_bar[i, :]
-                prev_neg = X_bar[i, :]
-                cnt += 1
+            cnt += 1
             prev_i = i
 
 

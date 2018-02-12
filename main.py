@@ -5,6 +5,7 @@ import sys
 import pdb
 import math
 import warnings
+from multiprocessing import Pool
 
 
 # start at x = 410, y = 400
@@ -23,6 +24,39 @@ from matplotlib import figure as fig
 #from matplotlib.pyplot import imshow, pause
 
 import time
+
+class parallel_args:
+    def __init__(self):
+        self.num_particles = 0
+        self.u_t0 = np.array([0,0,0])
+        self.u_t1 = np.array([0,0,0])
+        self.ranges = np.array([0,0,0])
+        self.means_type = "L"
+
+
+def parallel_motion_sensor_model(m, u_t0, u_t1, X_bar, ranges, meas_type, sensor_model, motion_model, X_bar_new):
+    """
+    MOTION MODEL
+    """
+    if np.linalg.norm(u_t0 - u_t1) != 0:
+        x_t0 = X_bar[m,:3]
+        x_t1 = motion_model.update(u_t0, u_t1, x_t0)
+    else:
+        x_t0 = X_bar[m, :3]
+        x_t1 = x_t0
+
+    """
+    SENSOR MODEL
+    """
+    if (meas_type == "L" ) and (np.linalg.norm(u_t0-u_t1) != 0):
+        z_t = ranges
+        w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
+        # w_t = 1/num_particles
+        X_bar_new[m,:] = np.hstack((x_t1, w_t))
+    else:
+        X_bar_new[m,:] = np.hstack((x_t1, X_bar[m,3]))
+
+    return X_bar_new
 
 def filter_close_map(occupancy_map):
     # filter
@@ -147,12 +181,13 @@ def main():
     """
     Monte Carlo Localization Algorithm : Main Loop
     """
-    if vis_flag:
-        visualize_map(occupancy_map)
+    # if vis_flag:
+    #     visualize_map(occupancy_map)
 
-    draw_robot(X_bar)
+    # draw_robot(X_bar)
         
     first_time_idx = True
+    u_t0 = np.array([0])
     for time_idx, line in enumerate(logfile):
 
         # Read a single 'line' from the log file (can be either odometry or laser measurement)
@@ -165,6 +200,7 @@ def main():
         # if ((time_stamp <= 0.0) | (meas_type == "O")): # ignore pure odometry measurements for now (faster debugging) 
             # continue
 
+        ranges = np.array([0])
         if (meas_type == "L"):
              odometry_laser = meas_vals[3:6] # [x, y, theta] coordinates of laser in odometry frame
              ranges = meas_vals[6:-1] # 180 range measurement values from single laser scan
@@ -176,32 +212,47 @@ def main():
             first_time_idx = False
             continue
 
-        X_bar_new = np.zeros( (num_particles,4), dtype=np.float64)
+        # X_bar_new = np.zeros( (num_particles,4), dtype=np.float64)
         u_t1 = odometry_robot
 
+        X_bar_new = X_bar
+
+        pool = Pool(4)
+
         for m in range(0, num_particles):
+            X_bar_new = pool.apply_async(parallel_motion_sensor_model, (num_particles, u_t0, u_t1, ranges, meas_type,
+                                                            sensor_model, motion_model, X_bar_new))
+            # X_bar_new = parallel_motion_sensor_model(m, u_t0, u_t1, X_bar, ranges, meas_type,
+            #                               sensor_model, motion_model, X_bar_new)
+            # pool.apply_async(parallel_motion_sensor_model, (num_particles, u_t0, u_t1, ranges, meas_type,
+            #                                                sensor_model, motion_model, X_bar_new))
 
-            """
-            MOTION MODEL
-            """
-            if np.linalg.norm(u_t0 - u_t1) != 0:
-                x_t0 = X_bar[m,:3]
-                x_t1 = motion_model.update(u_t0, u_t1, x_t0)
-            else:
-                x_t0 = X_bar[m, :3]
-                x_t1 = x_t0
+        pool.close()
+        pool.join()
 
-
-            """
-            SENSOR MODEL
-            """
-            if (meas_type == "L" ) and (np.linalg.norm(u_t0-u_t1) != 0):
-                z_t = ranges
-                w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
-                # w_t = 1/num_particles
-                X_bar_new[m,:] = np.hstack((x_t1, w_t))
-            else:
-                X_bar_new[m,:] = np.hstack((x_t1, X_bar[m,3]))
+        # for m in range(0, num_particles):
+        #
+        #     """
+        #     MOTION MODEL
+        #     """
+        #     if np.linalg.norm(u_t0 - u_t1) != 0:
+        #         x_t0 = X_bar[m,:3]
+        #         x_t1 = motion_model.update(u_t0, u_t1, x_t0)
+        #     else:
+        #         x_t0 = X_bar[m, :3]
+        #         x_t1 = x_t0
+        #
+        #
+        #     """
+        #     SENSOR MODEL
+        #     """
+        #     if (meas_type == "L" ) and (np.linalg.norm(u_t0-u_t1) != 0):
+        #         z_t = ranges
+        #         w_t = sensor_model.beam_range_finder_model(z_t, x_t1)
+        #         # w_t = 1/num_particles
+        #         X_bar_new[m,:] = np.hstack((x_t1, w_t))
+        #     else:
+        #         X_bar_new[m,:] = np.hstack((x_t1, X_bar[m,3]))
         
         X_bar = X_bar_new
         moved = np.linalg.norm(u_t0-u_t1) != 0
