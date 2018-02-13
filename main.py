@@ -266,7 +266,9 @@ def main():
                 print (X_bar.shape)
                 num_particles, _ = X_bar.shape
             if vis_flag:
+                fig = plt.gcf()
                 visualize_timestep(X_bar, time_idx, occupancy_map)
+                fig.savefig('./vid2/time_'+str(time_idx)+'.png')
 
 if __name__=="__main__":
     warnings.simplefilter(action='ignore', category=FutureWarning)
